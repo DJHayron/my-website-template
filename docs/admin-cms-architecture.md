@@ -112,7 +112,7 @@ API 刻意使用 `description` 以配合 Admin model，但 disk/public schema �
 
 Blog schema 另接受 `coverImage`、`featuredRank`、`order`、`relatedProjects`、`series` 與其他 passthrough keys。Admin create 不曝露這些欄位；Admin update 透過 `patchFrontmatter` 重寫 `title`、`date`、`summary`、`tags`、`published` 與 body，同時保留其他 raw frontmatter lines。Managed key 原有的註解／格式會被替換，保留欄位也可能移到 managed block 後，因此內容驗證仍是部署 gate。
 
-Slug 只允許 1–2 層、每層最多 64 字元的小寫 kebab-case。Path policy 拒絕 percent-encoded route、反斜線、空白、Windows reserved names、symlink 與超出 real content root 的路徑。一層文章不能同時成為兩層 series 的父節點。
+新文章 slug 只允許 1–2 層、每層最多 64 字元的小寫 kebab-case；這項命名規則不會強迫既有內容改名。Admin discovery／read／update／archive 另有 legacy-safe policy，可原樣管理既有的大小寫、點號、括號、內部空格、底線與 Unicode 路徑。Legacy policy 仍只允許 1–2 層，且拒絕空白邊界、空 segment、`.`／`..`、percent ambiguity、slash／backslash、控制字元與 Windows reserved names。API client 對每個 segment 分別編碼，server 驗證 raw route 不含 encoded separator，再以 decoded segments 配合 realpath boundary、一般檔案／目錄與 symlink checks。新的一層文章仍不能同時成為兩層 series 的父節點。
 
 ## 寫入完整性
 
@@ -192,7 +192,7 @@ Renderer 支援受控的 `youtube-nocookie.com` iframe。外部 `http(s)` link�
 | JWT 偽造／竊取 | 32-byte CSPRNG secret、HS256 strict claims、短 TTL、HttpOnly／Strict／Secure cookie、每 request whitelist／role re-check | 無 JTI denylist。竊取 token 在 TTL 內有效；以使用者移除／role 變更或 secret rotation 緊急撤銷。XSS 不能直接讀 HttpOnly cookie，但可在受害瀏覽器發 request。 |
 | CSRF／cross-origin mutation | Mandatory Origin、cross-site Fetch Metadata rejection、SameSite=Strict、exact allowlist | TLS／Host misconfiguration 可能造成誤拒或錯誤放行；allowlist 與 proxy 必須最小化並測試。 |
 | Editor 越權發布 | Route 與 store 雙層 RBAC；editor 只可 draft → draft | Admin 帳號遭入侵即有完整 lifecycle 權限；無 MFA、approval 或 dual control。 |
-| Path traversal／symlink escape | Strict slug、拒 percent／backslash、realpath boundary、directory/file type 與 symlink checks | 擁有 host filesystem 權限的攻擊者不在此 boundary 內；runtime RCE 可使用 process 可寫的整個 `/app/content`。 |
+| Path traversal／symlink escape | Canonical create slug；獨立 legacy-safe existing slug；segment-wise URL encoding；拒 encoded separator／percent ambiguity／dot segment／backslash；realpath boundary、directory/file type 與 symlink checks | 擁有 host filesystem 權限的攻擊者不在此 boundary 內；runtime RCE 可使用 process 可寫的整個 `/app/content`。 |
 | Stored XSS／不安全 URL | Raw HTML disabled、URL protocol policy、`rehype-sanitize`、preview 與 public 共用 pipeline | 外部 image/link/embed 仍有 privacy／tracking 風險；sanitize policy 更新需 regression tests。 |
 | Stale overwrite／半寫檔 | 每秒 authenticated revision heartbeat、dirty/conflict 保留本機內容、SHA-256 revision、409、process queue、temporary file + fsync + atomic rename | Heartbeat 是 polling 且 queue 不跨 process；NFS／非標準 FS semantics、disk-full 或 OS crash 仍需 backup／restore test。 |
 | Markdown 大面積誤刪 | Local-tab `Ctrl/Cmd+Z`／redo，以及手動寫入前最多四份 filesystem snapshots | Autosave 可能在 1 秒後寫入刪除；undo state 在切換文章、reload、關閉或 crash 後消失，filesystem snapshots 也只在 manual／lifecycle save 時輪替且與 live data 同 volume。仍需外部 backup。 |

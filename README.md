@@ -267,6 +267,7 @@ The following is a public, read-only content deployment; the `:ro` Blog mount ca
 
 ```bash
 docker run --rm -p 3000:3000 \
+  -e ADMIN_CMS_WRITE_ENABLED=false \
   -v ./content/site:/app/content/site:ro \
   -v ./content/blog:/app/content/blog:ro \
   -v ./content/projects:/app/content/projects:ro \
@@ -286,8 +287,12 @@ pnpm package:dist
 
 The generated `dist/portfolio-template-standalone` and zip intentionally do not
 include `content/`. Deploy the app shell once, then update site data by replacing
-or mounting `content/site`, `content/blog`, and `content/projects` on the server.
-This prevents a packaged app update from accidentally overwriting live content.
+or mounting content on the server. Mounting `content/site`, `content/blog`, and
+`content/projects` separately is a read-only topology and must use
+`ADMIN_CMS_WRITE_ENABLED=false`. A CMS writer must instead mount the whole
+`content` tree at `/app/content` as one writable persistent filesystem so Blog
+and `.trash/blog` share the same rename boundary. This prevents a packaged app
+update from accidentally overwriting live content.
 
 ## Security Notes
 

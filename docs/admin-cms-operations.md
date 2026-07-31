@@ -147,7 +147,8 @@ Cookie 名稱為 `admin_session`，具有 `HttpOnly`、`SameSite=Strict`、`Path
 
 ### 文章輸入限制
 
-- `slug`：1–2 層小寫 kebab-case；每層最多 64、總長最多 129。拒絕 `%`、反斜線、空白、path traversal 及 Windows reserved names。
+- 新文章 `slug`：1–2 層小寫 kebab-case；每層最多 64、總長最多 129。拒絕 `%`、反斜線、空白、path traversal 及 Windows reserved names。
+- 既有文章相容性：Admin 不會要求重新命名舊目錄；可原樣列出及管理 1–2 層的大小寫、點號、括號、內部空格、底線與 Unicode slug，例如 `CaseStudy`、`LeetCodeEssential150/1.TwoSums`、`8.StringToInteger(atoi)`、`LeetCode/模板`、`155.Min Stack`。這只適用於 filesystem 已存在的文章；建立新文章仍使用上述 canonical 規則。Legacy parser 仍拒絕空 segment、前後空白、`.`／`..`、slash／backslash、percent ambiguity、控制字元、Windows reserved names、超長與超過兩層的路徑。
 - `title`：1–160 字元；`description`：1–500 字元。
 - `content`：trim 後 1–500,000 字元；整份 JSON 另受 512 KiB byte limit 限制，因此大量非 ASCII 內容可能先碰到 byte limit。
 - `date`：真實的 `YYYY-MM-DD` 日曆日期。
@@ -316,7 +317,7 @@ content/.trash/blog/<archiveId>/
 人工復原程序：
 
 1. 停止唯一 writer，或設 `ADMIN_CMS_WRITE_ENABLED=false` 後 restart。
-2. 先備份整個 `content/`。讀取 `archive.json`，確認目錄名等於 `archiveId`，`slug` 符合 1–2 層小寫 kebab-case，並人工檢查封存目錄內的 `main.md` 與附件。
+2. 先備份整個 `content/`。讀取 `archive.json`，確認目錄名等於 `archiveId`，`slug` 符合前述既有文章的 1–2 層 legacy-safe 規則，並人工檢查封存目錄內的 `main.md` 與附件；不要為了還原而重新命名舊 slug。
 3. 確認 `content/blog/<slug>` 完全不存在。若目的地已存在，停止操作並人工合併；絕不可 overwrite。兩層 slug 的父目錄可以存在，但父目錄不可有自己的 `main.md`。
 4. 必要時建立沒有 `main.md` 的父目錄，再把 `<archiveRoot>/<slug>` 整個目錄 move 回 `content/blog/<slug>`。來源與目的必須在同 filesystem。
 5. 驗證檔案 owner／mode，執行 `pnpm validate:content`，再以 read-only instance 檢查 Admin 列表、預覽與公開頁。若復原檔為 `published: true`，恢復服務後會立即公開；需要先審稿時應在離線狀態改為 `published: false` 並重新驗證。
