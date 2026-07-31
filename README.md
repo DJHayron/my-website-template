@@ -1,8 +1,8 @@
 # PortfolioKit
 
-A sanitized, file-driven developer portfolio template built with Next.js, TypeScript, Tailwind CSS, runtime Markdown, and a pixel-night terminal interface.
+A sanitized, file-driven developer portfolio template built with Next.js, TypeScript, Tailwind CSS, runtime Markdown, a protected Blog Admin CMS, and a pixel-night terminal interface.
 
-The goal is to let personal site settings, page images, project cards, project detail pages, and blog posts update from files without rebuilding the app. This is useful when the same Docker image should keep running while `content/site`, `content/blog`, or `content/projects` is mounted from a volume, Git sync job, or private admin tool.
+The goal is to let personal site settings, page images, project cards, project detail pages, and blog posts update from files without rebuilding the app. The built-in authenticated Admin console can create, edit, preview, publish, and recoverably archive Blog posts; site settings and projects remain file-managed. This is useful when the same Docker image keeps running while `content/` is mounted from a persistent volume or updated by a Git sync job.
 
 ## Architecture
 
@@ -13,6 +13,8 @@ app/
   projects/[slug]/page.tsx     Project detail article
   blog/page.tsx                Blog search and reader
   blog/[...slug]/page.tsx      Direct article route
+  admin/                       Protected editorial console and login
+  api/admin/                   Auth, session, article, and preview APIs
 
 content/
   site/
@@ -27,6 +29,7 @@ content/
       main.md                  Blog frontmatter + markdown body
 
 lib/
+  admin/                       JWT, RBAC, request policy, and article writes
   projects/meta.ts             Runtime project metadata loader
   projects/details.ts          Project markdown loader
   projects/relations.ts        Blog/project relation matching
@@ -51,6 +54,7 @@ Blog articles use frontmatter:
 ---
 title: Template Architecture
 date: 2026-01-05
+summary: How the runtime content system is organized.
 tags:
   - Architecture
 relatedProjects:
@@ -64,6 +68,11 @@ Project-to-blog relations work in two ways:
 - Explicit: blog `relatedProjects` points to a project slug.
 - Tag-based: project `relatedTags` overlaps with blog `tags`.
 
+The Admin CMS deliberately manages Blog posts only. Its API/RBAC contract, environment variables, persistent-volume requirements, backups, archive recovery, and security boundaries are documented in:
+
+- [Admin CMS operations](docs/admin-cms-operations.md)
+- [Admin CMS architecture and threat model](docs/admin-cms-architecture.md)
+
 ## Validation And CI
 
 Local full check:
@@ -75,7 +84,7 @@ pnpm check
 Equivalent individual commands:
 
 ```bash
-pnpm audit --audit-level moderate
+pnpm audit:prod
 pnpm typecheck
 pnpm validate:content
 pnpm test:run
@@ -86,7 +95,7 @@ pnpm build
 CI runs the same quality gates before the Docker image build:
 
 ```txt
-pnpm audit:     No known vulnerabilities found
+production audit: No known vulnerabilities found
 typecheck:      pass
 content schema: pass
 unit tests:     pass
@@ -94,6 +103,8 @@ lint:           pass
 production build: pass
 docker build:   pass
 ```
+
+The full development-tree audit still reports a dev-only `ESLint → minimatch 3 → brace-expansion` advisory. Forcing brace-expansion v5 breaks that legacy consumer's API, so the enforced gate is `pnpm audit:prod` while the repository waits for the upstream minimatch 3 consumer to update.
 
 Docker build is enforced by GitHub Actions and can also be run locally with Docker installed:
 
@@ -150,13 +161,14 @@ Key reasons:
 - Runtime content keeps a small mtime cache so repeated reads avoid unnecessary markdown conversion.
 - Git-based content history remains simple and reviewable.
 
-The result is a small content system without requiring a CMS, database, or admin panel on day one.
+The result is a small content system with a protected Blog editorial console, while avoiding a database or external CMS service.
 
 ## Tradeoff
 
 This design intentionally accepts a few constraints:
 
-- File writes are not handled by this app. Use Git, a sync job, a mounted volume, or a separate admin tool.
+- The built-in Admin CMS writes Blog posts only; edit site settings and projects through files, Git, or a sync job.
+- CMS writes require one writable Node.js instance and a persistent filesystem shared by live Blog content and `content/.trash`; multi-writer and serverless ephemeral deployments are unsupported.
 - Runtime file reads plus mtime cache are simpler than a database, but not ideal for very large content collections.
 - Markdown raw HTML is disabled and rendered HTML is passed through `rehype-sanitize`.
 - Personal page images can live under `content/site/assets`; add your own optimized WebP/AVIF assets when ready.
@@ -174,6 +186,8 @@ Open:
 ```txt
 http://localhost:3000
 ```
+
+To enable `/admin`, generate the JWT secret and password hash, configure `.env.local`, then follow the [Admin CMS quick start](docs/admin-cms-operations.md#本機快速啟動). The placeholders in `.env.example` are intentionally unusable.
 
 ## Editing Projects
 
@@ -249,7 +263,7 @@ Build the image:
 docker build -t portfolio-kit .
 ```
 
-Run with mounted content:
+The following is a public, read-only content deployment; the `:ro` Blog mount cannot support Admin writes:
 
 ```bash
 docker run --rm -p 3000:3000 \
@@ -259,7 +273,7 @@ docker run --rm -p 3000:3000 \
   portfolio-kit
 ```
 
-With this setup, editing mounted content does not require rebuilding the Docker image.
+With this setup, editing mounted content on the host does not require rebuilding the Docker image. To enable Admin writes, mount the whole `/app/content` tree as one writable persistent volume, keep `blog` and `.trash/blog` on the same filesystem, and grant container UID/GID `1001:1001` access. See [Docker and persistent-volume operations](docs/admin-cms-operations.md#docker-與-persistent-volume).
 
 ## Standalone Dist Without Content
 
@@ -283,8 +297,13 @@ This prevents a packaged app update from accidentally overwriting live content.
 - Markdown images allow `http`, `https`, safe relative paths, and root-relative public paths.
 - Blog and project asset routes constrain paths to their content directories.
 - Site image assets served from `/site/assets` are constrained to `content/site/assets`.
-- Dependency audit is enforced by CI with `pnpm audit --audit-level moderate`.
-- Do not expose a write-enabled admin tool without authentication, CSRF protection, and path validation.
+- Production dependency audit is enforced by CI with `pnpm audit:prod`.
+- The built-in Admin uses JWT/HttpOnly cookies, a configured user whitelist, admin/editor RBAC, Origin validation, strict schemas, slug path guards, revision conflicts, atomic writes, and recoverable archives.
+- Secrets and password hashes must be injected at runtime and must never be committed. Review the full [threat model](docs/admin-cms-architecture.md#威脅模型) before enabling writes.
+
+## Admin CMS Verification Status
+
+CI defines a non-root named-volume write smoke, but the production persistent-volume deployment has not yet been exercised locally through login, write, archive, restart, and persistence. The Admin responsive implementation has also not yet been verified with the Codex in-app Browser at target viewports. These are explicit pre-production checks, not completed claims; see [known verification status](docs/admin-cms-operations.md#尚未完成的實機驗證).
 
 ## Commit Convention
 
