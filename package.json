@@ -8,19 +8,22 @@
     "build": "next build --webpack",
     "package:dist": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -ExecutionPolicy Bypass -File scripts/package-dist.ps1",
     "start": "next start",
+    "admin:hash-password": "tsx scripts/hash-admin-password.ts",
+    "admin:generate-secret": "tsx scripts/generate-admin-secret.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "validate:content": "tsx scripts/validate-content.ts",
     "test": "vitest",
     "test:run": "vitest run",
-    "check": "pnpm audit --audit-level moderate && pnpm typecheck && pnpm validate:content && pnpm test:run && pnpm lint && pnpm build"
+    "audit:prod": "pnpm audit --prod --audit-level moderate",
+    "check": "pnpm audit:prod && pnpm typecheck && pnpm validate:content && pnpm test:run && pnpm lint && pnpm build && git diff --check"
   },
   "dependencies": {
     "katex": "^0.16.45",
     "lucide-react": "^1.14.0",
-    "next": "16.2.6",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "next": "16.2.12",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "rehype-katex": "^7.0.1",
     "rehype-sanitize": "^6.0.0",
     "rehype-stringify": "^10.0.1",
@@ -28,34 +31,35 @@
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
     "remark-rehype": "^11.1.2",
-    "sharp": "^0.35.2",
-    "shiki": "^4.3.0",
+    "sharp": "^0.35.3",
+    "shiki": "^4.4.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
     "eslint": "^9",
-    "eslint-config-next": "16.2.6",
-    "postcss": "8.5.15",
-    "tailwindcss": "^4",
-    "tsx": "^4.22.3",
+    "eslint-config-next": "16.2.12",
+    "postcss": "8.5.25",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.1",
     "typescript": "^5",
     "vite": "8.0.16",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   },
   "pnpm": {
     "overrides": {
       "flatted": "3.4.2",
       "picomatch@<3": "2.3.2",
       "picomatch@>=4 <4.0.4": "4.0.4",
-      "brace-expansion@<2": "1.1.13",
-      "brace-expansion@>=4 <5.0.6": "5.0.6",
-      "postcss": "8.5.15",
+      "brace-expansion@<2": "1.1.18",
+      "brace-expansion@>=4": "5.0.9",
+      "postcss": "8.5.25",
+      "sharp": "0.35.3",
       "vite": "8.0.16",
-      "js-yaml": "4.2.0"
+      "js-yaml": "4.3.0"
     }
   }
 }

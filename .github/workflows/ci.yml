@@ -13,6 +13,46 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check committed patch whitespace
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            git diff --check "$PR_BASE_SHA" "$PR_HEAD_SHA"
+          elif [[ -n "$BEFORE_SHA" && ! "$BEFORE_SHA" =~ ^0+$ ]] \
+            && git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+            git diff --check "$BEFORE_SHA" "$GITHUB_SHA"
+          else
+            git show --check --format= HEAD
+          fi
+
+      - name: Scan repository for committed secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          secret_pattern='(-----BEGIN ([A-Z0-9]+ )?PRIVATE KEY-----|A(KIA|SIA)[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{36,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{20,}|scrypt\$16384\$8\$5\$[A-Za-z0-9_-]{22,}\$[A-Za-z0-9_-]{86,}|^[[:space:]]*ADMIN_JWT_SECRET[[:space:]]*=[[:space:]]*[A-Za-z0-9_-]{43,}[[:space:]]*$)'
+
+          scan_status=0
+          git grep --ignore-case -I --files-with-matches \
+            --extended-regexp "$secret_pattern" -- . || scan_status=$?
+
+          if [[ "$scan_status" -eq 0 ]]; then
+            echo "::error::Potential committed secret or password hash detected."
+            exit 1
+          fi
+
+          if [[ "$scan_status" -ne 1 ]]; then
+            echo "::error::The repository secret scan failed to run."
+            exit "$scan_status"
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -26,8 +66,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run audit
-        run: pnpm audit --audit-level moderate
+      # The remaining full-tree advisory is in a development-only minimatch 3
+      # chain; overriding its incompatible brace-expansion API breaks ESLint.
+      - name: Audit production dependencies
+        run: pnpm audit:prod
 
       - name: Run typecheck
         run: pnpm typecheck
@@ -48,3 +90,31 @@ jobs:
         run: docker build -t portfolio-template:ci .
         # Future tagging example:
         # docker build -t ghcr.io/<owner>/<repo>:${{ github.sha }} .
+
+      - name: Smoke test non-root writable content volume
+        shell: bash
+        run: |
+          set -euo pipefail
+          volume_name="portfolio-content-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cleanup() {
+            docker volume rm --force "$volume_name" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker volume create "$volume_name" >/dev/null
+          docker run --rm \
+            --mount "type=volume,source=${volume_name},target=/app/content" \
+            --entrypoint sh \
+            portfolio-template:ci \
+            -ec '
+              test "$(id -u)" = "1001"
+              test "$(id -g)" = "1001"
+              test -d /app/content/blog
+              test -d /app/content/.trash/blog
+              test -w /app/content/blog
+              test -w /app/content/.trash/blog
+              touch /app/content/blog/.cms-write-smoke
+              touch /app/content/.trash/blog/.cms-write-smoke
+              rm /app/content/blog/.cms-write-smoke
+              rm /app/content/.trash/blog/.cms-write-smoke
+            '

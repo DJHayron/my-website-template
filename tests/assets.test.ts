@@ -106,8 +106,32 @@ describe("content path helpers", () => {
   it("limits blog asset filesystem paths to images", () => {
     expect(getPostAssetFilePath("post", ["diagram.png"])).not.toBeNull();
     expect(getPostAssetFilePath("post", ["main.md"])).toBeNull();
+    expect(getPostAssetFilePath("post", ["main.1.md"])).toBeNull();
+    expect(getPostAssetFilePath("post", ["main.4.md"])).toBeNull();
     expect(getPostAssetFilePath("series", ["post", "main.md"])).toBeNull();
     expect(getPostAssetFilePath("post", [".env"])).toBeNull();
+  });
+
+  it("never serves retained Markdown versions through the public blog asset route", async () => {
+    const temporaryAsset = await createTemporaryBlogAsset();
+
+    try {
+      await fs.writeFile(
+        path.join(process.cwd(), "content", "blog", temporaryAsset.slug, "main.1.md"),
+        "previous private source",
+        "utf8",
+      );
+      const response = await getBlogAssetResponse(
+        new Request(`https://example.test/blog/assets/${temporaryAsset.slug}/main.1.md`),
+        {
+          params: Promise.resolve({ asset: [temporaryAsset.slug, "main.1.md"] }),
+        },
+      );
+
+      expect(response.status).toBe(404);
+    } finally {
+      await temporaryAsset.cleanup();
+    }
   });
 
   it("rewrites and constrains runtime site assets", async () => {

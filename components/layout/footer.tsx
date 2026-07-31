@@ -1,3 +1,6 @@
+"use client";
+
+import { usePathname } from "next/navigation";
 import { Container } from "@/components/ui/container";
 import { PixelIcon } from "@/components/ui/pixel-icon";
 import { ui } from "@/components/ui/pixel-theme";
@@ -10,7 +13,12 @@ type FooterProps = {
 };
 
 export function Footer({ contactLinks, siteProfile }: FooterProps) {
+  const pathname = usePathname();
   const currentYear = new Date().getFullYear();
+
+  if (pathname.startsWith("/admin")) {
+    return null;
+  }
 
   return (
     <footer className="relative mt-0 overflow-hidden border-t border-cyan-300/10 bg-[#050714] py-3">

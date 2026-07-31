@@ -27,16 +27,21 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV BLOG_CONTENT_DIRECTORY=/app/content/blog
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup -S -g 1001 nodejs \
+    && adduser -S -D -H -u 1001 -G nodejs nextjs
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/content ./content
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --chown=nextjs:nodejs --from=builder /app/public ./public
+COPY --chown=nextjs:nodejs --from=builder /app/content ./content
+COPY --chown=nextjs:nodejs --from=builder /app/.next/standalone ./
+COPY --chown=nextjs:nodejs --from=builder /app/.next/static ./.next/static
 
-USER nextjs
+RUN mkdir -p /app/content/blog /app/content/.trash/blog \
+    && chown -R nextjs:nodejs /app/content \
+    && chmod -R u+rwX /app/content
+
+USER nextjs:nodejs
 
 EXPOSE 3000
 

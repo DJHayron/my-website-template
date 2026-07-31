@@ -10,6 +10,9 @@ dist
 .turbo
 .cache
 .pnpm-store
+content/.trash
+content/blog/**/main.[1-4].md
+content/blog/**/.main*.tmp
 *.log
 *.tsbuildinfo
 *.pem
