@@ -135,10 +135,11 @@ describe("admin article store", () => {
       ),
     ).resolves.toContain("155.Min Stack legacy title");
 
-    await expect(store.create("CaseStudy/new-post", draft, "editor")).rejects.toMatchObject({
-      code: "invalid_slug",
-      status: 400,
-    });
+    const createdInLegacyPath = await store.create("CaseStudy/NewPost", draft, "editor");
+    expect(createdInLegacyPath.slug).toBe("CaseStudy/NewPost");
+    await expect(
+      readFile(path.join(store.blogDirectory, "CaseStudy", "NewPost", "main.md"), "utf8"),
+    ).resolves.toContain(draft.title);
     await expect(store.create("casestudy/new-post", draft, "editor")).rejects.toMatchObject({
       code: "slug_case_conflict",
       status: 409,

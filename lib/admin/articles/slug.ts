@@ -1,20 +1,12 @@
 import { AdminApiError } from "@/lib/admin/http";
-import {
-  parseSafeExistingBlogSlug,
-  type SafeExistingBlogSlug,
-} from "@/lib/blog/slug";
-
-const CANONICAL_SEGMENT_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const WINDOWS_RESERVED_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
-const MAXIMUM_CANONICAL_SEGMENT_LENGTH = 64;
-const MAXIMUM_CANONICAL_SLUG_LENGTH = MAXIMUM_CANONICAL_SEGMENT_LENGTH * 2 + 1;
+import { parseSafeExistingBlogSlug } from "@/lib/blog/slug";
 
 export type ValidatedArticleSlug = {
   pathSegments: string[];
   slug: string;
 };
 
-function invalidSlug(message = "Slug 必須是 1–2 層的小寫 kebab-case 路徑。"): never {
+function invalidSlug(message = "Slug 必須是 1–2 層的安全文章路徑。"): never {
   throw new AdminApiError(
     400,
     "invalid_slug",
@@ -22,55 +14,25 @@ function invalidSlug(message = "Slug 必須是 1–2 層的小寫 kebab-case 路
   );
 }
 
-function getPathSegments(value: string | readonly string[]) {
-  return typeof value === "string" ? value.split("/") : [...value];
-}
-
 export function parseArticleSlug(value: string | readonly string[]): ValidatedArticleSlug {
-  const pathSegments = getPathSegments(value);
-  const rawValue = pathSegments.join("/");
+  const parsed = parseSafeExistingBlogSlug(value);
 
-  if (
-    rawValue.length === 0 ||
-    rawValue.length > MAXIMUM_CANONICAL_SLUG_LENGTH ||
-    rawValue.includes("%") ||
-    rawValue.includes("\\") ||
-    rawValue.trim() !== rawValue
-  ) {
+  if (!parsed) {
     return invalidSlug();
   }
 
-  if (
-    pathSegments.length < 1 ||
-    pathSegments.length > 2 ||
-    pathSegments.some(
-      (segment) =>
-        segment.length === 0 ||
-        segment.length > MAXIMUM_CANONICAL_SEGMENT_LENGTH ||
-        !CANONICAL_SEGMENT_PATTERN.test(segment) ||
-        WINDOWS_RESERVED_NAME.test(segment),
-    )
-  ) {
-    return invalidSlug();
-  }
-
-  return { pathSegments, slug: pathSegments.join("/") };
+  return parsed;
 }
 
 /**
- * Existing content predates the CMS naming convention. Preserve exact safe
- * filesystem names while keeping new article creation on canonical slugs.
+ * Creation and existing-content operations intentionally share one safe path
+ * policy so authors can add posts beneath legacy PascalCase or Unicode paths
+ * without renaming published URLs.
  */
 export function parseExistingArticleSlug(
   value: string | readonly string[],
 ): ValidatedArticleSlug {
-  const parsed = parseSafeExistingBlogSlug(value);
-
-  if (!parsed) {
-    return invalidSlug("既有文章 slug 必須是 1–2 層的安全路徑。");
-  }
-
-  return parsed satisfies SafeExistingBlogSlug;
+  return parseArticleSlug(value);
 }
 
 export function assertSafeArticleRoutePath(request: Request) {

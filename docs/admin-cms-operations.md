@@ -147,8 +147,8 @@ Cookie 名稱為 `admin_session`，具有 `HttpOnly`、`SameSite=Strict`、`Path
 
 ### 文章輸入限制
 
-- 新文章 `slug`：1–2 層小寫 kebab-case；每層最多 64、總長最多 129。拒絕 `%`、反斜線、空白、path traversal 及 Windows reserved names。
-- 既有文章相容性：Admin 不會要求重新命名舊目錄；可原樣列出及管理 1–2 層的大小寫、點號、括號、內部空格、底線與 Unicode slug，例如 `CaseStudy`、`LeetCodeEssential150/1.TwoSums`、`8.StringToInteger(atoi)`、`LeetCode/模板`、`155.Min Stack`。這只適用於 filesystem 已存在的文章；建立新文章仍使用上述 canonical 規則。Legacy parser 仍拒絕空 segment、前後空白、`.`／`..`、slash／backslash、percent ambiguity、控制字元、Windows reserved names、超長與超過兩層的路徑。
+- 新文章與既有文章共用安全 `slug` 規則：可原樣使用 1–2 層的大小寫、點號、括號、內部空格、底線與 Unicode 路徑，例如 `CaseStudy/NewPost`、`LeetCodeEssential150/2.AddTwoNumbers`、`8.StringToInteger(atoi)`、`LeetCode/模板`、`155.Min Stack`。因此可以直接在原有大駝峰資料夾下新增文章，不會自動重新命名路徑。
+- 路徑安全限制：每層最多 255 字元、總長最多 511；拒絕空 segment、前後空白、`.`／`..`、結尾點號、slash／backslash、percent ambiguity、控制字元、Windows reserved names、超長與超過兩層的路徑。建立時仍會檢查大小寫／Unicode 正規化碰撞、父文章衝突、symlink 與 content root 邊界。
 - `title`：1–160 字元；`description`：1–500 字元。
 - `content`：trim 後 1–500,000 字元；整份 JSON 另受 512 KiB byte limit 限制，因此大量非 ASCII 內容可能先碰到 byte limit。
 - `date`：真實的 `YYYY-MM-DD` 日曆日期。

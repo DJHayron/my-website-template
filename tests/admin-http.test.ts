@@ -24,6 +24,37 @@ describe("admin request parsing", () => {
     ).toEqual({ content: "## 模板", slug: "LeetCode/模板" });
   });
 
+  it("accepts a new post in an existing legacy-style path without normalizing it", () => {
+    const result = createArticleRequestSchema.safeParse({
+      content: "Body",
+      date: "2026-07-31",
+      description: "Summary",
+      published: false,
+      slug: "LeetCodeEssential150/2.AddTwoNumbers",
+      tags: ["LeetCode"],
+      title: "Add Two Numbers",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.slug).toBe("LeetCodeEssential150/2.AddTwoNumbers");
+    }
+  });
+
+  it("does not silently trim whitespace from a new article path", () => {
+    const result = createArticleRequestSchema.parse({
+      content: "Body",
+      date: "2026-07-31",
+      description: "Summary",
+      published: false,
+      slug: " CaseStudy/NewPost ",
+      tags: ["CMS"],
+      title: "Path validation",
+    });
+
+    expect(result.slug).toBe(" CaseStudy/NewPost ");
+  });
+
   it("rejects line breaks inside a tag so the line-based editor is lossless", () => {
     const result = createArticleRequestSchema.safeParse({
       content: "Body",

@@ -112,7 +112,7 @@ API 刻意使用 `description` 以配合 Admin model，但 disk/public schema �
 
 Blog schema 另接受 `coverImage`、`featuredRank`、`order`、`relatedProjects`、`series` 與其他 passthrough keys。Admin create 不曝露這些欄位；Admin update 透過 `patchFrontmatter` 重寫 `title`、`date`、`summary`、`tags`、`published` 與 body，同時保留其他 raw frontmatter lines。Managed key 原有的註解／格式會被替換，保留欄位也可能移到 managed block 後，因此內容驗證仍是部署 gate。
 
-新文章 slug 只允許 1–2 層、每層最多 64 字元的小寫 kebab-case；這項命名規則不會強迫既有內容改名。Admin discovery／read／update／archive 另有 legacy-safe policy，可原樣管理既有的大小寫、點號、括號、內部空格、底線與 Unicode 路徑。Legacy policy 仍只允許 1–2 層，且拒絕空白邊界、空 segment、`.`／`..`、percent ambiguity、slash／backslash、控制字元與 Windows reserved names。API client 對每個 segment 分別編碼，server 驗證 raw route 不含 encoded separator，再以 decoded segments 配合 realpath boundary、一般檔案／目錄與 symlink checks。新的一層文章仍不能同時成為兩層 series 的父節點。
+新文章與既有文章共用同一套 safe path policy，可原樣使用 1–2 層的大小寫、點號、括號、內部空格、底線與 Unicode 路徑。這讓作者能在 `CaseStudy`、`LeetCodeEssential150` 等既有大駝峰目錄中建立新文章，而不改寫已發布 URL。Policy 拒絕空白邊界、空 segment、`.`／`..`、結尾點號、percent ambiguity、slash／backslash、控制字元、Windows reserved names、超長與超過兩層的路徑。API client 對每個 segment 分別編碼，server 驗證 raw route 不含 encoded separator，再以 decoded segments 配合 portable case／Unicode collision、realpath boundary、一般檔案／目錄與 symlink checks。新的一層文章仍不能同時成為兩層 series 的父節點。
 
 ## 寫入完整性
 

@@ -32,6 +32,10 @@ import { NeonButton } from "@/components/ui/neon-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { adminRequest, AdminClientError } from "@/components/admin/admin-api";
 import { getAdminArticleApiPath } from "@/lib/admin/article-url";
+import {
+  MAXIMUM_EXISTING_BLOG_SLUG_LENGTH,
+  parseSafeExistingBlogSlug,
+} from "@/lib/blog/slug";
 import { serializeFrontmatter } from "@/lib/content/frontmatter";
 import { formatAdminUpdatedAt } from "@/lib/admin/date";
 import {
@@ -251,6 +255,7 @@ export function AdminConsole({ initialSession }: AdminConsoleProps) {
   const isPublishedEditor = !isAdmin && form.published;
   const hasSelection = selectedSlug !== null;
   const isMutationInFlight = isSaving || isAutoSaving;
+  const slugIsSafe = parseSafeExistingBlogSlug(form.slug) !== null;
 
   useEffect(() => {
     latestFormRef.current = form;
@@ -743,6 +748,12 @@ export function AdminConsole({ initialSession }: AdminConsoleProps) {
     setHasAttemptedSubmit(true);
     const formElement = formRef.current;
 
+    if (!slugIsSafe) {
+      formElement?.querySelector<HTMLElement>("#post-slug")?.focus();
+      setError("Slug 必須是 1–2 層的安全文章路徑。");
+      return false;
+    }
+
     if (tagsAreInvalid) {
       formElement?.querySelector<HTMLElement>("#post-tags")?.focus();
       setError("標籤最多 20 個，且每個標籤不可超過 40 個字元。");
@@ -978,13 +989,9 @@ export function AdminConsole({ initialSession }: AdminConsoleProps) {
 
   useEffect(() => {
     const previewSnapshot = serializePreviewInput(form);
-    const slugIsValid =
-      (Boolean(selectedSlug) && form.slug === selectedSlug) ||
-      (form.slug.length <= 129 &&
-        /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?$/.test(form.slug));
 
     if (
-      !slugIsValid ||
+      !slugIsSafe ||
       !form.content.trim() ||
       lastPreviewSnapshotRef.current === previewSnapshot ||
       isArticleLoading ||
@@ -1011,6 +1018,7 @@ export function AdminConsole({ initialSession }: AdminConsoleProps) {
     isOnline,
     isPageVisible,
     isSaving,
+    slugIsSafe,
   ]);
 
   useEffect(() => {
@@ -1838,25 +1846,20 @@ export function AdminConsole({ initialSession }: AdminConsoleProps) {
                       </label>
                       <input
                         aria-describedby="post-slug-help"
-                        aria-invalid={hasAttemptedSubmit && !form.slug}
+                        aria-invalid={hasAttemptedSubmit && !slugIsSafe}
                         className="h-11 w-full rounded border border-[#26344d] bg-[#050914] px-3 font-mono text-sm text-cyan-100 outline-none invalid:border-rose-400 focus:border-[#6ea8b0] focus:ring-2 focus:ring-cyan-300/20 disabled:opacity-60"
                         disabled={hasSelection || isArticleLoading || isPublishedEditor}
                         id="post-slug"
-                        maxLength={hasSelection ? 511 : 129}
+                        maxLength={MAXIMUM_EXISTING_BLOG_SLUG_LENGTH}
                         onChange={(event) => updateField("slug", event.target.value)}
-                        pattern={
-                          hasSelection
-                            ? undefined
-                            : "[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?"
-                        }
-                        placeholder="engineering/admin-cms"
+                        placeholder="LeetCodeEssential150/2.AddTwoNumbers"
                         required
                         value={form.slug}
                       />
                       <p className="mt-1 text-xs text-slate-400" id="post-slug-help">
                         {hasSelection
                           ? "沿用既有安全路徑；建立後不可更名。"
-                          : "新文章使用 1–2 層小寫 kebab-case；建立後不可更名。"}
+                          : "新文章使用 1–2 層安全路徑，可沿用 PascalCase、點號、括號、空格或 Unicode；建立後不可更名。"}
                       </p>
                     </div>
                     <div>

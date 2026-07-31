@@ -10,7 +10,12 @@ describe("admin article slugs", () => {
   it.each([
     ["release-notes", ["release-notes"]],
     ["engineering/release-notes", ["engineering", "release-notes"]],
-  ])("accepts canonical slug %s", (slug, pathSegments) => {
+    ["CaseStudy/NewPost", ["CaseStudy", "NewPost"]],
+    ["LeetCodeEssential150/2.AddTwoNumbers", ["LeetCodeEssential150", "2.AddTwoNumbers"]],
+    ["8.StringToInteger(atoi)", ["8.StringToInteger(atoi)"]],
+    ["LeetCode/模板", ["LeetCode", "模板"]],
+    ["155.Min Stack", ["155.Min Stack"]],
+  ])("accepts safe creation slug %s", (slug, pathSegments) => {
     expect(parseArticleSlug(slug)).toEqual({ pathSegments, slug });
   });
 
@@ -20,15 +25,17 @@ describe("admin article slugs", () => {
     "..",
     "posts/../secret",
     "three/levels/deep",
-    "Uppercase",
-    "has space",
-    "中文",
+    " path",
+    "path ",
     "path\\escape",
     "encoded%2fseparator",
     "encoded%252fseparator",
     "con",
     "series/lpt1",
-    `${"a".repeat(65)}`,
+    "question?",
+    "trailing.",
+    "control\u0000character",
+    `${"a".repeat(256)}`,
   ])("rejects unsafe slug %s", (slug) => {
     expect(() => parseArticleSlug(slug)).toThrowError(
       expect.objectContaining({ code: "invalid_slug", status: 400 }),

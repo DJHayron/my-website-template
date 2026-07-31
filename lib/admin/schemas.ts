@@ -27,7 +27,7 @@ const articleFields = {
 
 export const createArticleRequestSchema = z.object({
   ...articleFields,
-  slug: z.string().trim().min(1).max(129),
+  slug: z.string().min(1).max(MAXIMUM_EXISTING_BLOG_SLUG_LENGTH),
 }).strict();
 
 export const updateArticleRequestSchema = z.object({
