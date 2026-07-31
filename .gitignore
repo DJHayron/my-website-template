@@ -21,6 +21,13 @@
 /build
 /dist
 
+# recoverable CMS archives are runtime data
+/content/.trash/
+
+# local CMS article history is runtime data
+/content/blog/**/main.[1-4].md
+/content/blog/**/.main*.tmp
+
 # misc
 .DS_Store
 *.pem
