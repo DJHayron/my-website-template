@@ -6,6 +6,7 @@ import { stripByteOrderMark } from "./cache";
 import { parseFrontmatter } from "./frontmatter";
 import { isSafeMarkdownUrl } from "./url-policy";
 import { isSafeResumeDownloadUrl } from "@/lib/site/assets";
+import { blogFrontmatterSchema } from "@/lib/blog/schema";
 
 const PROJECT_GROUPS = ["featured", "systems", "experiments"] as const;
 const PROJECT_MATURITIES = [
@@ -18,7 +19,6 @@ const PROJECT_MATURITIES = [
 ] as const;
 const ACCENTS = ["cyan", "blue", "purple", "pink", "amber", "green"] as const;
 const SINGLE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const BLOG_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const SITE_ASSET_EXTENSIONS = new Set([
   ".avif",
   ".gif",
@@ -76,22 +76,6 @@ const projectMetaSchema = z.object({
   repoUrl: z.string().trim().min(1).optional(),
   scope: z.string().trim().min(1).optional(),
   year: z.string().trim().min(1).optional(),
-}).passthrough();
-
-const blogFrontmatterSchema = z.object({
-  title: z.string().trim().min(1),
-  date: z.preprocess(
-    (value) => value instanceof Date ? value.toISOString().slice(0, 10) : value,
-    z.string().regex(BLOG_DATE_PATTERN),
-  ),
-  summary: z.string().trim().min(1),
-  tags: stringArraySchema.optional(),
-  published: z.boolean().optional(),
-  coverImage: z.string().trim().min(1).optional(),
-  featuredRank: z.coerce.number().finite().optional(),
-  order: z.coerce.number().finite().optional(),
-  relatedProjects: stringArraySchema.optional(),
-  series: z.string().trim().min(1).optional(),
 }).passthrough();
 
 const siteImageSchema = z.union([
