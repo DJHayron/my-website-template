@@ -230,10 +230,6 @@ export function BlogSearchApp({
   );
 
   useEffect(() => {
-    setPage(1);
-  }, [queryKey]);
-
-  useEffect(() => {
     const delay = query.trim() ? 250 : 0;
     const timeoutId = window.setTimeout(() => {
       const cachedPage = pageCache[queryKey]?.[page];
