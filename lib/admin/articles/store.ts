@@ -2,10 +2,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { BLOG_CONTENT_DIRECTORY, BLOG_POST_FILE_NAME } from "@/lib/blog/constants";
-import { blogFrontmatterSchema, type BlogFrontmatterData } from "@/lib/blog/schema";
+import { parseBlogFrontmatter } from "@/lib/blog/parse-frontmatter";
+import type { BlogFrontmatterData } from "@/lib/blog/schema";
 import { clearContentCache } from "@/lib/content/cache";
 import {
-  parseFrontmatter,
   patchFrontmatter,
   serializeFrontmatter,
 } from "@/lib/content/frontmatter";
@@ -26,6 +26,7 @@ import type {
   AdminRole,
   AdminSaveMode,
 } from "@/types/admin";
+import type { BlogPostMeta } from "@/types/blog";
 
 type ArticleStoreOptions = {
   blogDirectory?: string;
@@ -36,7 +37,6 @@ type ArticleStoreOptions = {
 
 type ArticleSource = {
   article: AdminArticle;
-  data: BlogFrontmatterData;
   directoryPath: string;
   filePath: string;
   source: string;
@@ -61,23 +61,21 @@ function createRevision(source: string) {
 }
 
 function toArticle(
-  slug: string,
   source: string,
-  data: BlogFrontmatterData,
+  content: string,
+  meta: BlogPostMeta,
   updatedAt: string,
 ): AdminArticle {
-  const { content } = parseFrontmatter(source);
-
   return {
     content,
-    date: data.date,
-    description: data.summary,
-    pathSegments: slug.split("/"),
-    published: data.published ?? false,
+    date: meta.date,
+    description: meta.summary,
+    pathSegments: meta.pathSegments,
+    published: meta.published,
     revision: createRevision(source),
-    slug,
-    tags: data.tags ?? [],
-    title: data.title,
+    slug: meta.slug,
+    tags: meta.tags,
+    title: meta.title,
     updatedAt,
   };
 }
@@ -324,16 +322,14 @@ export function createArticleStore(options: ArticleStoreOptions = {}) {
       throw error;
     }
 
-    const parsed = parseFrontmatter(source);
-    const frontmatter = blogFrontmatterSchema.safeParse(parsed.data);
-
-    if (!frontmatter.success || !parsed.content.trim()) {
-      throw new AdminApiError(500, "invalid_article_source", "文章來源格式不正確。");
-    }
+    const parsed = parseBlogFrontmatter(
+      source,
+      location.slug,
+      location.pathSegments,
+    );
 
     return {
-      article: toArticle(location.slug, source, frontmatter.data, stats.mtime.toISOString()),
-      data: frontmatter.data,
+      article: toArticle(source, parsed.content, parsed.meta, stats.mtime.toISOString()),
       directoryPath: location.directoryPath,
       filePath: location.filePath,
       source,

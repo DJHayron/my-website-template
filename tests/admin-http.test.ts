@@ -38,6 +38,28 @@ describe("admin request parsing", () => {
     expect(result.success).toBe(false);
   });
 
+  it("keeps placeholder dates invalid for create and update writes", () => {
+    const article = {
+      content: "Body",
+      date: "YYYY-MM-DD",
+      description: "Summary",
+      published: false,
+      tags: ["CMS"],
+      title: "Strict write validation",
+    };
+
+    expect(
+      createArticleRequestSchema.safeParse({ ...article, slug: "strict-write" }).success,
+    ).toBe(false);
+    expect(
+      updateArticleRequestSchema.safeParse({
+        ...article,
+        revision: "a".repeat(64),
+        saveMode: "manual",
+      }).success,
+    ).toBe(false);
+  });
+
   it("defaults legacy updates to manual mode and rejects unsupported modes", () => {
     const request = {
       content: "Body",

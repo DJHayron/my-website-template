@@ -15,6 +15,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createArticleStore } from "@/lib/admin/articles/store";
 import { writeArticleWithHistory } from "@/lib/admin/articles/versions";
+import { parseBlogFrontmatter } from "@/lib/blog/parse-frontmatter";
 import { parseFrontmatter, serializeFrontmatter } from "@/lib/content/frontmatter";
 import type { AdminArticleInput } from "@/types/admin";
 
@@ -142,6 +143,75 @@ describe("admin article store", () => {
       code: "slug_case_conflict",
       status: 409,
     });
+  });
+
+  it("uses public Blog fallbacks when existing frontmatter is incomplete", async () => {
+    const store = getStore();
+    const slug = "LeetCode/模板";
+    const articleDirectory = path.join(store.blogDirectory, ...slug.split("/"));
+    const articlePath = path.join(articleDirectory, "main.md");
+
+    await mkdir(articleDirectory, { recursive: true });
+    await store.create("strict-article", draft, "editor");
+    await writeFile(
+      articlePath,
+      `---
+date: YYYY-MM-DD
+tags: Legacy, CMS
+published: true
+order: 7
+customField: keep
+---
+
+# Legacy body
+`,
+      "utf8",
+    );
+
+    const listed = await store.list();
+    const legacyArticle = listed.find((article) => article.slug === slug);
+
+    expect(listed.map((article) => article.slug).sort()).toEqual(
+      [slug, "strict-article"].sort(),
+    );
+    expect(legacyArticle).toMatchObject({
+      date: "1970-01-01",
+      description: "No summary provided.",
+      published: true,
+      slug,
+      tags: ["Legacy", "CMS"],
+      title: "模板",
+    });
+
+    const current = await store.read(slug);
+    expect(current.content).toContain("# Legacy body");
+
+    const updated = await store.update(
+      slug,
+      { ...draft, revision: current.revision },
+      "admin",
+    );
+    const persistedSource = await readFile(articlePath, "utf8");
+    const persisted = parseFrontmatter(persistedSource);
+    const publicPost = parseBlogFrontmatter(persistedSource, slug, slug.split("/"));
+
+    expect(updated).toMatchObject({
+      date: draft.date,
+      description: draft.description,
+      published: false,
+      tags: draft.tags,
+      title: draft.title,
+    });
+    expect(persisted.data).toMatchObject({
+      customField: "keep",
+      date: draft.date,
+      order: 7,
+      published: false,
+      summary: draft.description,
+      tags: draft.tags,
+      title: draft.title,
+    });
+    expect(publicPost.meta.order).toBe(7);
   });
 
   it("rejects duplicates, unsafe slugs, and parent article collisions", async () => {
