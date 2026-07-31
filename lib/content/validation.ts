@@ -7,6 +7,7 @@ import { parseFrontmatter } from "./frontmatter";
 import { isSafeMarkdownUrl } from "./url-policy";
 import { isSafeResumeDownloadUrl } from "@/lib/site/assets";
 import { blogFrontmatterSchema } from "@/lib/blog/schema";
+import { parseSafeExistingBlogSlug } from "@/lib/blog/slug";
 
 const PROJECT_GROUPS = ["featured", "systems", "experiments"] as const;
 const PROJECT_MATURITIES = [
@@ -580,8 +581,39 @@ async function validateBlogPosts(
   issues: ContentValidationIssue[],
 ) {
   const postFiles = await findBlogPostFiles(blogDirectory);
+  const postRecords = postFiles.map((filePath) => {
+    const relativeDirectory = path.relative(blogDirectory, path.dirname(filePath));
+    const slug = relativeDirectory.split(path.sep).join("/");
 
-  for (const filePath of postFiles) {
+    return {
+      filePath,
+      parsedSlug: parseSafeExistingBlogSlug(slug),
+      slug,
+    };
+  });
+  const safePostSlugs = new Set(
+    postRecords.flatMap(({ parsedSlug }) => parsedSlug ? [parsedSlug.slug] : []),
+  );
+  let visiblePostCount = 0;
+
+  for (const { filePath, parsedSlug, slug } of postRecords) {
+    if (!parsedSlug) {
+      issues.push({
+        filePath: toDisplayPath(rootDirectory, filePath),
+        message: "Blog post folder must use one or two safe path segments.",
+      });
+    } else if (
+      parsedSlug.pathSegments.length === 2 &&
+      safePostSlugs.has(parsedSlug.pathSegments[0])
+    ) {
+      issues.push({
+        filePath: toDisplayPath(rootDirectory, filePath),
+        message: `Blog post "${slug}" is nested under another article directory.`,
+      });
+    } else {
+      visiblePostCount += 1;
+    }
+
     const source = stripByteOrderMark(await fs.readFile(filePath, "utf8"));
     const { data, content } = parseFrontmatter(source);
     const parsedFrontmatter = blogFrontmatterSchema.safeParse(data);
@@ -618,7 +650,7 @@ async function validateBlogPosts(
     }
   }
 
-  return postFiles.length;
+  return visiblePostCount;
 }
 
 async function validateSiteSettings(

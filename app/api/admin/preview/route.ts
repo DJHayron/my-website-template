@@ -1,5 +1,5 @@
 import { loadAdminConfig } from "@/lib/admin/config";
-import { parseArticleSlug } from "@/lib/admin/articles/slug";
+import { parseExistingArticleSlug } from "@/lib/admin/articles/slug";
 import {
   AdminApiError,
   apiSuccess,
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
 
     requireRequestSession(request, ["admin", "editor"], config);
     const body = await readJsonBody(request, previewArticleRequestSchema);
-    const { slug } = parseArticleSlug(body.slug);
+    const { slug } = parseExistingArticleSlug(body.slug);
     const html = await markdownToHtml(body.content, { slug });
     return apiSuccess({ html });
   } catch (error) {

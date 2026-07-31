@@ -7,6 +7,7 @@ import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelIcon } from "@/components/ui/pixel-icon";
 import { ui } from "@/components/ui/pixel-theme";
 import { Section } from "@/components/ui/section";
+import { getBlogArticlePath } from "@/lib/blog/slug";
 import { cn, formatDate } from "@/lib/utils";
 import {
   getAllProjectSlugs,
@@ -226,7 +227,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                   {detail.relatedPosts.map((post) => (
                     <a
                       className="block rounded-[4px] border border-[#26344d] bg-[#101827] p-3 transition duration-200 hover:border-[#6ea8b0] hover:bg-[#151e2f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200"
-                      href={`/blog/${post.slug}`}
+                      href={getBlogArticlePath(post.slug)}
                       key={post.slug}
                     >
                       <p className="clamp-2 font-mono text-sm font-bold leading-6 text-[#eef3ff]">

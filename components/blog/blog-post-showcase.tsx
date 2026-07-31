@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { MouseEvent } from "react";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelIcon } from "@/components/ui/pixel-icon";
+import { getBlogArticlePath } from "@/lib/blog/slug";
 import { cn, formatDate } from "@/lib/utils";
 import type { SiteSettings } from "@/lib/site/settings";
 import type { BlogPostListItem, BlogPostListingPage, BlogSortOrder } from "@/types/blog";
@@ -107,7 +108,7 @@ function BlogPostCard({
 
         <Link
           className="mt-4 block rounded-[4px] text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-200"
-          href={`/blog/${post.slug}`}
+          href={getBlogArticlePath(post.slug)}
           onClick={handleOpenPost}
         >
           <h3 className="clamp-2 font-mono text-xl font-black leading-7 text-white transition group-hover:text-cyan-100">
@@ -126,7 +127,7 @@ function BlogPostCard({
           <div className="flex flex-wrap justify-end gap-2">
             <Link
               className="inline-flex h-9 items-center gap-2 rounded-[4px] border border-[#30445f] bg-[#101827] px-3 font-mono text-xs font-bold text-[#b9dfe3] shadow-[inset_0_-2px_0_#050914,inset_0_1px_0_rgba(255,255,255,0.045)] transition duration-200 hover:border-[#6ea8b0] hover:bg-[#151e2f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50"
-              href={`/blog/${post.slug}`}
+              href={getBlogArticlePath(post.slug)}
               onClick={handleOpenPost}
             >
               {copy.quickReadButtonLabel}

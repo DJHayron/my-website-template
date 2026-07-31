@@ -4,8 +4,9 @@ import Link from "next/link";
 import { type MouseEvent, useEffect, useMemo, useState } from "react";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelIcon } from "@/components/ui/pixel-icon";
-import { cn, formatDate } from "@/lib/utils";
+import { getBlogArticlePath } from "@/lib/blog/slug";
 import { sortPostsByPublishedOrder } from "@/lib/blog/sorting";
+import { cn, formatDate } from "@/lib/utils";
 import type { SiteSettings } from "@/lib/site/settings";
 import type {
   BlogPostListing,
@@ -218,7 +219,7 @@ export function BlogSeriesSidebar({
                       ? "bg-[#111a2b] text-[#b9dfe3]"
                       : "text-[#b7c2e0] hover:bg-[#151e2f] hover:text-white",
                   )}
-                  href={`/blog/${post.slug}`}
+                  href={getBlogArticlePath(post.slug)}
                   key={post.slug}
                   onClick={handleOpenPost(post.slug)}
                 >

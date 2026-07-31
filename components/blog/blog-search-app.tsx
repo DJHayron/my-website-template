@@ -14,6 +14,10 @@ import { BlogSeriesSidebar } from "@/components/blog/blog-series-sidebar";
 import { BlogSeriesFilter } from "@/components/blog/blog-series-filter";
 import { BlogTagFilter } from "@/components/blog/blog-tag-filter";
 import type { ProjectItem } from "@/data/site";
+import {
+  getBlogArticleApiPath,
+  getBlogArticlePath,
+} from "@/lib/blog/slug";
 import type { SiteSettings } from "@/lib/site/settings";
 import type {
   BlogPost,
@@ -92,9 +96,6 @@ const createEmptyPage = (page: number): BlogPostListingPage => ({
   totalItems: 0,
   totalPages: 0,
 });
-
-const getDetailApiPath = (slug: string) =>
-  `/api/blog/posts/${slug.split("/").map(encodeURIComponent).join("/")}`;
 
 const getSlugFromBlogPath = (pathname: string) => {
   const match = /^\/blog\/(.+)$/.exec(pathname);
@@ -300,7 +301,7 @@ export function BlogSearchApp({
       setViewMode("read");
 
       if (options.updateRoute !== false && typeof window !== "undefined") {
-        window.history.pushState({ blogReaderSlug: slug }, "", `/blog/${slug}`);
+        window.history.pushState({ blogReaderSlug: slug }, "", getBlogArticlePath(slug));
       }
 
       if (detailCache[slug]) {
@@ -310,7 +311,7 @@ export function BlogSearchApp({
       setLoadingDetailSlug(slug);
 
       try {
-        const response = await fetch(getDetailApiPath(slug), { cache: "no-store" });
+        const response = await fetch(getBlogArticleApiPath(slug), { cache: "no-store" });
 
         if (!response.ok) {
           throw new Error(`Failed to load article: ${response.status}`);

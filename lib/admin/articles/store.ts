@@ -13,7 +13,10 @@ import { AdminApiError } from "@/lib/admin/http";
 import { canMutateArticle, getUpdateMutation } from "@/lib/admin/policy";
 import { atomicWriteTextFile } from "@/lib/admin/articles/atomic-write";
 import { writeArticleWithHistory } from "@/lib/admin/articles/versions";
-import { parseArticleSlug } from "@/lib/admin/articles/slug";
+import {
+  parseArticleSlug,
+  parseExistingArticleSlug,
+} from "@/lib/admin/articles/slug";
 import type {
   AdminArticle,
   AdminArticleInput,
@@ -193,7 +196,9 @@ export function createArticleStore(options: ArticleStoreOptions = {}) {
   }
 
   async function resolveLocation(slugValue: string | readonly string[], mustExist: boolean) {
-    const { pathSegments, slug } = parseArticleSlug(slugValue);
+    const { pathSegments, slug } = mustExist
+      ? parseExistingArticleSlug(slugValue)
+      : parseArticleSlug(slugValue);
     const realRoot = await ensureBlogRoot();
     const directoryPath = path.resolve(realRoot, ...pathSegments);
 
@@ -204,6 +209,33 @@ export function createArticleStore(options: ArticleStoreOptions = {}) {
     let currentPath = realRoot;
 
     for (const segment of pathSegments) {
+      if (mustExist) {
+        let entries;
+
+        try {
+          entries = await fs.readdir(currentPath, { withFileTypes: true });
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+            throw new AdminApiError(404, "article_not_found", "找不到指定文章。");
+          }
+          throw error;
+        }
+
+        const exactEntry = entries.find((entry) => entry.name === segment);
+
+        if (!exactEntry) {
+          throw new AdminApiError(404, "article_not_found", "找不到指定文章。");
+        }
+
+        currentPath = path.join(currentPath, exactEntry.name);
+        const stats = await fs.lstat(currentPath);
+
+        if (!stats.isDirectory() || stats.isSymbolicLink()) {
+          throw new AdminApiError(409, "unsafe_article_path", "文章路徑與既有檔案衝突。");
+        }
+        continue;
+      }
+
       currentPath = path.join(currentPath, segment);
 
       try {
@@ -223,13 +255,50 @@ export function createArticleStore(options: ArticleStoreOptions = {}) {
       }
     }
 
+    const resolvedDirectoryPath = mustExist ? currentPath : directoryPath;
+
     return {
-      directoryPath,
-      filePath: path.join(directoryPath, BLOG_POST_FILE_NAME),
+      directoryPath: resolvedDirectoryPath,
+      filePath: path.join(resolvedDirectoryPath, BLOG_POST_FILE_NAME),
       pathSegments,
       realRoot,
       slug,
     };
+  }
+
+  async function assertNoPortableSlugCollision(pathSegments: readonly string[]) {
+    const realRoot = await ensureBlogRoot();
+    let parentPath = realRoot;
+
+    for (const segment of pathSegments) {
+      const entries = await fs.readdir(parentPath, { withFileTypes: true });
+      const portableSegment = segment.normalize("NFC").toLocaleLowerCase("en-US");
+      const collisions = entries.filter(
+        (entry) =>
+          entry.name.normalize("NFC").toLocaleLowerCase("en-US") === portableSegment,
+      );
+      const conflictingEntry = collisions.find((entry) => entry.name !== segment);
+
+      if (conflictingEntry) {
+        throw new AdminApiError(
+          409,
+          "slug_case_conflict",
+          "新文章 slug 與既有路徑只有大小寫或 Unicode 正規化差異。",
+        );
+      }
+
+      const exactEntry = collisions.find((entry) => entry.name === segment);
+
+      if (!exactEntry) {
+        return;
+      }
+
+      if (!exactEntry.isDirectory() || exactEntry.isSymbolicLink()) {
+        return;
+      }
+
+      parentPath = path.join(parentPath, exactEntry.name);
+    }
   }
 
   async function readSource(slugValue: string | readonly string[]): Promise<ArticleSource> {
@@ -282,7 +351,7 @@ export function createArticleStore(options: ArticleStoreOptions = {}) {
       }
 
       try {
-        parseArticleSlug(rootEntry.name);
+        parseExistingArticleSlug(rootEntry.name);
       } catch {
         continue;
       }
@@ -323,7 +392,7 @@ export function createArticleStore(options: ArticleStoreOptions = {}) {
         }
 
         try {
-          parseArticleSlug(childSlug);
+          parseExistingArticleSlug(childSlug);
         } catch {
           continue;
         }
@@ -374,7 +443,9 @@ export function createArticleStore(options: ArticleStoreOptions = {}) {
         throw new AdminApiError(403, "forbidden", "Editor 只能建立草稿。");
       }
 
-      const location = await resolveLocation(slugValue, false);
+      const parsedSlug = parseArticleSlug(slugValue);
+      await assertNoPortableSlugCollision(parsedSlug.pathSegments);
+      const location = await resolveLocation(parsedSlug.slug, false);
 
       try {
         await fs.lstat(location.directoryPath);

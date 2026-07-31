@@ -158,7 +158,7 @@ describe("protected admin API", () => {
         {
           content:
             "# 安全預覽\n\n<script>alert('xss')</script>\n\n[危險連結](javascript:alert('xss'))",
-          slug: "safe-preview",
+          slug: "LeetCode/模板",
         },
         cookie,
       ),

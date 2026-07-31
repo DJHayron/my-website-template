@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { BLOG_CONTENT_DIRECTORY, BLOG_POST_FILE_NAME } from "@/lib/blog/constants";
+import { parseSafeExistingBlogSlug } from "@/lib/blog/slug";
 
 const URL_SCHEME_PATTERN = /^[a-z][a-z\d+.-]*:/i;
 const BLOG_ASSET_EXTENSIONS = new Set([
@@ -25,14 +26,7 @@ const isInsideDirectory = (parent: string, target: string) =>
   target === parent || target.startsWith(`${parent}${path.sep}`);
 
 export function getSlugSegments(slug: string | string[]) {
-  const segments = Array.isArray(slug) ? slug : slug.split("/");
-  const normalizedSegments = segments.map((segment) => segment.trim()).filter(Boolean);
-
-  if (normalizedSegments.length === 0 || normalizedSegments.some(hasUnsafeSegment)) {
-    return null;
-  }
-
-  return normalizedSegments;
+  return parseSafeExistingBlogSlug(slug)?.pathSegments ?? null;
 }
 
 export function getSlugFromSegments(segments: string[]) {
@@ -124,23 +118,55 @@ export function getPostMarkdownFilePath(slug: string | string[]) {
   return postDirectory ? path.join(postDirectory, BLOG_POST_FILE_NAME) : null;
 }
 
+async function getExactPostDirectoryPath(slug: string | string[]) {
+  const slugSegments = getSlugSegments(slug);
+
+  if (!slugSegments) {
+    return null;
+  }
+
+  let currentDirectory = getContentRoot();
+
+  try {
+    for (const segment of slugSegments) {
+      const entries = await fs.readdir(currentDirectory, { withFileTypes: true });
+      const exactEntry = entries.find((entry) => entry.name === segment);
+
+      if (!exactEntry?.isDirectory() || exactEntry.isSymbolicLink()) {
+        return null;
+      }
+
+      currentDirectory = path.join(currentDirectory, exactEntry.name);
+    }
+  } catch {
+    return null;
+  }
+
+  return currentDirectory;
+}
+
 export async function getSafePostMarkdownFilePath(slug: string | string[]) {
-  const postDirectory = getPostDirectoryPath(slug);
-  const filePath = getPostMarkdownFilePath(slug);
+  const postDirectory = await getExactPostDirectoryPath(slug);
+  const filePath = postDirectory
+    ? path.join(postDirectory, BLOG_POST_FILE_NAME)
+    : null;
 
   if (!postDirectory || !filePath) {
     return null;
   }
 
   try {
-    const [contentRoot, realPostDirectory, realFilePath] = await Promise.all([
+    const [contentRoot, realPostDirectory, realFilePath, fileStats] = await Promise.all([
       fs.realpath(getContentRoot()),
       fs.realpath(postDirectory),
       fs.realpath(filePath),
+      fs.lstat(filePath),
     ]);
     const realPostMarkdownPath = path.join(realPostDirectory, BLOG_POST_FILE_NAME);
 
-    return realPostDirectory !== contentRoot &&
+    return fileStats.isFile() &&
+      !fileStats.isSymbolicLink() &&
+      realPostDirectory !== contentRoot &&
       isInsideDirectory(contentRoot, realPostDirectory) &&
       realFilePath === realPostMarkdownPath
       ? realFilePath

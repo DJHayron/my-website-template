@@ -10,6 +10,7 @@ import { PixelCard } from "@/components/ui/pixel-card";
 import { PixelIcon } from "@/components/ui/pixel-icon";
 import { ui } from "@/components/ui/pixel-theme";
 import { getPostBySlug, getPublishedPostListItems } from "@/lib/blog";
+import { getBlogArticlePath } from "@/lib/blog/slug";
 import { getPublishedProjects } from "@/lib/projects/meta";
 import { getRelatedProjectsForPost } from "@/lib/projects/relations";
 import { getSiteSettings } from "@/lib/site/settings";
@@ -43,17 +44,19 @@ export async function generateMetadata({
     };
   }
 
+  const articlePath = getBlogArticlePath(post.slug);
+
   return {
     title: post.title,
     description: post.summary,
     alternates: {
-      canonical: `/blog/${post.slug}`,
+      canonical: articlePath,
     },
     openGraph: {
       title: post.title,
       description: post.summary,
       type: "article",
-      url: new URL(`/blog/${post.slug}`, `${siteSettings.siteUrl}/`).toString(),
+      url: new URL(articlePath, `${siteSettings.siteUrl}/`).toString(),
       publishedTime: post.date,
       tags: post.tags,
       images: post.coverImage ? [post.coverImage] : undefined,

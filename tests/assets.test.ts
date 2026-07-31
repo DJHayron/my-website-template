@@ -7,9 +7,14 @@ import { GET as getSiteAssetResponse } from "@/app/site/assets/[...asset]/route"
 import {
   getBlogAssetUrl,
   getPostAssetFilePath,
+  getSafePostMarkdownFilePath,
   getSlugSegments,
   getVersionedBlogAssetUrl,
 } from "@/lib/blog/assets";
+import {
+  getBlogArticleApiPath,
+  getBlogArticlePath,
+} from "@/lib/blog/slug";
 import {
   getSafeResumePdfFilePath,
   getSafeSiteAssetFilePath,
@@ -55,10 +60,50 @@ Body`,
   };
 }
 
+async function createTemporaryLegacyBlogPost() {
+  const slug = `CaseAlias-${process.pid}-${Date.now()}`;
+  const postDirectory = path.join(process.cwd(), "content", "blog", slug);
+  const filePath = path.join(postDirectory, "main.md");
+
+  await fs.mkdir(postDirectory, { recursive: true });
+  await fs.writeFile(
+    filePath,
+    `---
+title: Legacy path boundary test
+date: 2026-01-01
+summary: Exact path identity test.
+tags:
+  - Test
+published: true
+---
+
+Body`,
+    "utf8",
+  );
+
+  return {
+    cleanup: () => fs.rm(postDirectory, { force: true, recursive: true }),
+    filePath,
+    postDirectory,
+    slug,
+  };
+}
+
 describe("content path helpers", () => {
   it("validates blog and project slug shapes", () => {
     expect(getSlugSegments("series/post")).toEqual(["series", "post"]);
+    expect(getSlugSegments("LeetCodeEssential150/1.TwoSums")).toEqual([
+      "LeetCodeEssential150",
+      "1.TwoSums",
+    ]);
+    expect(getSlugSegments("LeetCode/模板")).toEqual(["LeetCode", "模板"]);
+    expect(getSlugSegments("155.Min Stack")).toEqual(["155.Min Stack"]);
     expect(getSlugSegments("../post")).toBeNull();
+    expect(getSlugSegments("series//post")).toBeNull();
+    expect(getSlugSegments("three/levels/deep")).toBeNull();
+    expect(getSlugSegments("encoded%2fseparator")).toBeNull();
+    expect(getSlugSegments("question?")).toBeNull();
+    expect(getSlugSegments("trailing.")).toBeNull();
     expect(getProjectSlugSegments("project-a")).toEqual(["project-a"]);
     expect(getProjectSlugSegments("series/project-a")).toBeNull();
   });
@@ -70,6 +115,62 @@ describe("content path helpers", () => {
     expect(getProjectAssetUrl("project-a", "demo.png")).toBe(
       "/projects/assets/project-a/demo.png",
     );
+    expect(getBlogAssetUrl("LeetCode/模板", "diagram.png")).toBe(
+      "/blog/assets/LeetCode/%E6%A8%A1%E6%9D%BF/diagram.png",
+    );
+  });
+
+  it.each([
+    ["CaseStudy", "/blog/CaseStudy", "/api/blog/posts/CaseStudy"],
+    [
+      "LeetCode/模板",
+      "/blog/LeetCode/%E6%A8%A1%E6%9D%BF",
+      "/api/blog/posts/LeetCode/%E6%A8%A1%E6%9D%BF",
+    ],
+    ["155.Min Stack", "/blog/155.Min%20Stack", "/api/blog/posts/155.Min%20Stack"],
+    [
+      "legacy/question#1",
+      "/blog/legacy/question%231",
+      "/api/blog/posts/legacy/question%231",
+    ],
+  ])("encodes public article slug %s segment by segment", (slug, pathUrl, apiUrl) => {
+    expect(getBlogArticlePath(slug)).toBe(pathUrl);
+    expect(getBlogArticleApiPath(slug)).toBe(apiUrl);
+  });
+
+  it("requires exact on-disk casing for public article paths", async () => {
+    const temporaryPost = await createTemporaryLegacyBlogPost();
+
+    try {
+      await expect(getSafePostMarkdownFilePath(temporaryPost.slug)).resolves.toBe(
+        await fs.realpath(temporaryPost.filePath),
+      );
+      await expect(
+        getSafePostMarkdownFilePath(temporaryPost.slug.toLocaleLowerCase("en-US")),
+      ).resolves.toBeNull();
+    } finally {
+      await temporaryPost.cleanup();
+    }
+  });
+
+  it("rejects in-root directory symlink aliases for public article paths", async () => {
+    const temporaryPost = await createTemporaryLegacyBlogPost();
+    const aliasSlug = `legacy-alias-${process.pid}-${Date.now()}`;
+    const aliasDirectory = path.join(process.cwd(), "content", "blog", aliasSlug);
+
+    try {
+      await fs.symlink(
+        temporaryPost.postDirectory,
+        aliasDirectory,
+        process.platform === "win32" ? "junction" : "dir",
+      );
+      await expect(getSafePostMarkdownFilePath(aliasSlug)).resolves.toBeNull();
+    } finally {
+      await fs.unlink(aliasDirectory).catch(async () => {
+        await fs.rmdir(aliasDirectory).catch(() => undefined);
+      });
+      await temporaryPost.cleanup();
+    }
   });
 
   it("adds canonical versions only to safe relative blog asset URLs", async () => {

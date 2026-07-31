@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { blogTagSchema } from "@/lib/blog/schema";
+import { MAXIMUM_EXISTING_BLOG_SLUG_LENGTH } from "@/lib/blog/slug";
 
 export const loginRequestSchema = z.object({
   password: z.string().min(1).max(256),
@@ -37,7 +38,7 @@ export const updateArticleRequestSchema = z.object({
 
 export const previewArticleRequestSchema = z.object({
   content: articleFields.content,
-  slug: z.string().trim().min(1).max(129),
+  slug: z.string().min(1).max(MAXIMUM_EXISTING_BLOG_SLUG_LENGTH),
 }).strict();
 
 export type CreateArticleRequest = z.infer<typeof createArticleRequestSchema>;

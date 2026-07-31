@@ -31,6 +31,7 @@ import { MarkdownCopyButtons } from "@/components/blog/markdown-copy-buttons";
 import { NeonButton } from "@/components/ui/neon-button";
 import { PixelCard } from "@/components/ui/pixel-card";
 import { adminRequest, AdminClientError } from "@/components/admin/admin-api";
+import { getAdminArticleApiPath } from "@/lib/admin/article-url";
 import { serializeFrontmatter } from "@/lib/content/frontmatter";
 import { formatAdminUpdatedAt } from "@/lib/admin/date";
 import {
@@ -507,7 +508,7 @@ export function AdminConsole({ initialSession }: AdminConsoleProps) {
 
     try {
       const result = await adminRequest<{ article: AdminArticle }>(
-        `/api/admin/posts/${slug}`,
+        getAdminArticleApiPath(slug),
       );
       if (
         requestSequence !== articleRequestSequence.current ||
@@ -833,7 +834,7 @@ export function AdminConsole({ initialSession }: AdminConsoleProps) {
     try {
       const result = submittedSlug
         ? await adminRequest<{ article: AdminArticle }>(
-            `/api/admin/posts/${submittedSlug}`,
+            getAdminArticleApiPath(submittedSlug),
             {
               body: JSON.stringify({
                 ...payload,
@@ -978,8 +979,9 @@ export function AdminConsole({ initialSession }: AdminConsoleProps) {
   useEffect(() => {
     const previewSnapshot = serializePreviewInput(form);
     const slugIsValid =
-      form.slug.length <= 129 &&
-      /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?$/.test(form.slug);
+      (Boolean(selectedSlug) && form.slug === selectedSlug) ||
+      (form.slug.length <= 129 &&
+        /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?$/.test(form.slug));
 
     if (
       !slugIsValid ||
@@ -1057,7 +1059,7 @@ export function AdminConsole({ initialSession }: AdminConsoleProps) {
         const editorEpoch = editorEpochRef.current;
         requestContext = { editorEpoch, generation, localRevision, slug };
         const result = await adminRequest<Pick<AdminArticle, "revision" | "updatedAt">>(
-          `/api/admin/posts/${slug}?view=revision`,
+          `${getAdminArticleApiPath(slug)}?view=revision`,
         );
 
         if (
@@ -1092,7 +1094,7 @@ export function AdminConsole({ initialSession }: AdminConsoleProps) {
 
         if (action === "reload") {
           const fullResult = await adminRequest<{ article: AdminArticle }>(
-            `/api/admin/posts/${slug}`,
+            getAdminArticleApiPath(slug),
           );
 
           if (
@@ -1222,7 +1224,7 @@ export function AdminConsole({ initialSession }: AdminConsoleProps) {
 
     try {
       await adminRequest<{ archive: { archiveId: string } }>(
-        `/api/admin/posts/${selectedSlug}`,
+        getAdminArticleApiPath(selectedSlug),
         { method: "DELETE" },
       );
       const archivedSlug = selectedSlug;
@@ -1840,15 +1842,21 @@ export function AdminConsole({ initialSession }: AdminConsoleProps) {
                         className="h-11 w-full rounded border border-[#26344d] bg-[#050914] px-3 font-mono text-sm text-cyan-100 outline-none invalid:border-rose-400 focus:border-[#6ea8b0] focus:ring-2 focus:ring-cyan-300/20 disabled:opacity-60"
                         disabled={hasSelection || isArticleLoading || isPublishedEditor}
                         id="post-slug"
-                        maxLength={129}
+                        maxLength={hasSelection ? 511 : 129}
                         onChange={(event) => updateField("slug", event.target.value)}
-                        pattern="[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?"
+                        pattern={
+                          hasSelection
+                            ? undefined
+                            : "[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?"
+                        }
                         placeholder="engineering/admin-cms"
                         required
                         value={form.slug}
                       />
                       <p className="mt-1 text-xs text-slate-400" id="post-slug-help">
-                        1–2 層小寫 kebab-case；建立後不可更名。
+                        {hasSelection
+                          ? "沿用既有安全路徑；建立後不可更名。"
+                          : "新文章使用 1–2 層小寫 kebab-case；建立後不可更名。"}
                       </p>
                     </div>
                     <div>

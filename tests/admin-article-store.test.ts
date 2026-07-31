@@ -62,6 +62,88 @@ describe("admin article store", () => {
     await expect(store.list({ status: "published" })).resolves.toEqual([]);
   });
 
+  it("lists and manages existing articles without renaming legacy slugs", async () => {
+    const store = getStore();
+    const legacySlugs = [
+      "CaseStudy/Overview",
+      "LeetCodeEssential150/1.TwoSums",
+      "8.StringToInteger(atoi)",
+      "LeetCode/模板",
+      "155.Min Stack",
+    ];
+
+    for (const slug of legacySlugs) {
+      const articleDirectory = path.join(store.blogDirectory, ...slug.split("/"));
+      await mkdir(articleDirectory, { recursive: true });
+      await writeFile(
+        path.join(articleDirectory, "main.md"),
+        serializeFrontmatter(
+          {
+            date: draft.date,
+            published: false,
+            summary: `${slug} legacy summary`,
+            tags: draft.tags,
+            title: `${slug} legacy title`,
+          },
+          draft.content,
+        ),
+        "utf8",
+      );
+    }
+
+    const listed = await store.list();
+    expect(listed.map((article) => article.slug).sort()).toEqual([...legacySlugs].sort());
+
+    const current = await store.read("LeetCode/模板");
+    await expect(store.read("leetcode/模板")).rejects.toMatchObject({
+      code: "article_not_found",
+      status: 404,
+    });
+    const updated = await store.update(
+      current.slug,
+      {
+        ...draft,
+        content: `${draft.content}\n\nLegacy update`,
+        revision: current.revision,
+      },
+      "editor",
+      "autosave",
+    );
+    await expect(store.readRevision(current.slug)).resolves.toMatchObject({
+      revision: updated.revision,
+    });
+    await expect(
+      readFile(path.join(store.blogDirectory, "LeetCode", "模板", "main.md"), "utf8"),
+    ).resolves.toContain("Legacy update");
+
+    const archive = await store.archive("155.Min Stack", "admin");
+    expect(archive.slug).toBe("155.Min Stack");
+    await expect(store.read("155.Min Stack")).rejects.toMatchObject({
+      code: "article_not_found",
+      status: 404,
+    });
+    await expect(
+      readFile(
+        path.join(
+          store.trashDirectory,
+          archive.archiveId,
+          "155.Min Stack",
+          "main.md",
+        ),
+        "utf8",
+      ),
+    ).resolves.toContain("155.Min Stack legacy title");
+
+    await expect(store.create("CaseStudy/new-post", draft, "editor")).rejects.toMatchObject({
+      code: "invalid_slug",
+      status: 400,
+    });
+    await expect(store.create("casestudy/new-post", draft, "editor")).rejects.toMatchObject({
+      code: "slug_case_conflict",
+      status: 409,
+    });
+  });
+
   it("rejects duplicates, unsafe slugs, and parent article collisions", async () => {
     const store = getStore();
     await store.create("release-notes", draft, "editor");

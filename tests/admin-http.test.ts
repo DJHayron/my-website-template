@@ -18,6 +18,12 @@ describe("admin request parsing", () => {
     );
   });
 
+  it("accepts an existing Unicode slug for the shared Markdown preview", () => {
+    expect(
+      previewArticleRequestSchema.parse({ content: "## 模板", slug: "LeetCode/模板" }),
+    ).toEqual({ content: "## 模板", slug: "LeetCode/模板" });
+  });
+
   it("rejects line breaks inside a tag so the line-based editor is lossless", () => {
     const result = createArticleRequestSchema.safeParse({
       content: "Body",

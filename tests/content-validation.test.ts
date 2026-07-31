@@ -35,6 +35,23 @@ async function writeValidProject(slug = "project-a") {
   await writeFile(`content/projects/${slug}/main.md`, "# Project A\n\n![Diagram](diagram.png)");
 }
 
+async function writeValidBlogPost(slug: string, title = slug) {
+  await writeFile(
+    `content/blog/${slug}/main.md`,
+    `---
+title: ${title}
+date: 2026-01-01
+summary: Legacy-compatible article.
+tags:
+  - Test
+published: true
+---
+
+# ${title}
+`,
+  );
+}
+
 beforeEach(async () => {
   rootDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "portfolio-content-"));
 });
@@ -69,6 +86,38 @@ published: true
 
     expect(result.issues).toEqual([]);
     expect(result.projects).toBe(1);
+    expect(result.blogPosts).toBe(1);
+  });
+
+  it("accepts safe existing legacy blog folder names", async () => {
+    await Promise.all([
+      writeValidBlogPost("CaseStudy"),
+      writeValidBlogPost("LeetCodeEssential150/1.TwoSums"),
+      writeValidBlogPost("8.StringToInteger(atoi)"),
+      writeValidBlogPost("LeetCode/模板"),
+      writeValidBlogPost("155.Min Stack"),
+    ]);
+
+    const result = await validateContent(rootDirectory);
+
+    expect(result.issues).toEqual([]);
+    expect(result.blogPosts).toBe(5);
+  });
+
+  it("reports blog layouts hidden by the runtime loader", async () => {
+    await Promise.all([
+      writeValidBlogPost("parent"),
+      writeValidBlogPost("parent/child"),
+      writeValidBlogPost("one/two/three"),
+    ]);
+
+    const result = await validateContent(rootDirectory);
+    const messages = result.issues.map((issue) => issue.message);
+
+    expect(messages).toContain(
+      'Blog post "parent/child" is nested under another article directory.',
+    );
+    expect(messages).toContain("Blog post folder must use one or two safe path segments.");
     expect(result.blogPosts).toBe(1);
   });
 

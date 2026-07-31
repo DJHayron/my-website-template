@@ -1,6 +1,6 @@
 import { loadAdminConfig } from "@/lib/admin/config";
 import { articleStore } from "@/lib/admin/articles/store";
-import { assertUnencodedArticlePath } from "@/lib/admin/articles/slug";
+import { assertSafeArticleRoutePath } from "@/lib/admin/articles/slug";
 import {
   AdminApiError,
   apiSuccess,
@@ -26,7 +26,7 @@ export async function GET(request: Request, { params }: AdminPostRouteContext) {
   try {
     const config = loadAdminConfig();
     requireRequestSession(request, ["admin", "editor"], config);
-    assertUnencodedArticlePath(request);
+    assertSafeArticleRoutePath(request);
     const { slug } = await params;
 
     const requestedViews = new URL(request.url).searchParams.getAll("view");
@@ -58,7 +58,7 @@ export async function PUT(request: Request, { params }: AdminPostRouteContext) {
 
     const session = requireRequestSession(request, ["admin", "editor"], config);
     assertCmsWriteEnabled(config);
-    assertUnencodedArticlePath(request);
+    assertSafeArticleRoutePath(request);
     const { slug } = await params;
     const body = await readJsonBody(request, updateArticleRequestSchema);
     const { saveMode, ...articleInput } = body;
@@ -79,7 +79,7 @@ export async function DELETE(request: Request, { params }: AdminPostRouteContext
 
     const session = requireRequestSession(request, ["admin"], config);
     assertCmsWriteEnabled(config);
-    assertUnencodedArticlePath(request);
+    assertSafeArticleRoutePath(request);
     const { slug } = await params;
     const archive = await articleStore.archive(slug, session.user.role);
     return apiSuccess({ archive });
